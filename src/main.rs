@@ -134,13 +134,13 @@ fn generate_cnf(problem: Problem) -> Result<GenSolution, Error> {
         .map(|i| UDynExprNode::variable(creator.clone(), input_num_bits))
         .collect::<Vec<_>>();
 
-    let index_bits_val =
-        UDynExprNode::try_constant_n(creator.clone(), input_num_bits, index_bits).unwrap();
+    let index_bits_val_m1 =
+        UDynExprNode::try_constant_n(creator.clone(), input_num_bits, index_bits - 1).unwrap();
     let mut conds = conds.clone();
     let max_layer_inputs = gnl_subsums
         .into_iter()
         .map(|num| {
-            let (out, new_cond) = num.cond_add(index_bits_val.clone());
+            let (out, new_cond) = num.cond_add(index_bits_val_m1.clone());
             conds &= new_cond;
             out
         })
@@ -153,7 +153,7 @@ fn generate_cnf(problem: Problem) -> Result<GenSolution, Error> {
             .skip(problem.max_gates * i)
             .take(problem.max_gates)
             .fold(conds, |conds, input| {
-                conds & input.clone().less_than(max_layer_inputs[i].clone())
+                conds & input.clone().less_equal(max_layer_inputs[i].clone())
             });
     }
 
@@ -161,15 +161,15 @@ fn generate_cnf(problem: Problem) -> Result<GenSolution, Error> {
         .into_iter()
         .map(|i| UDynExprNode::variable(creator.clone(), input_num_bits))
         .collect::<Vec<_>>();
-    
+
     let gnl_max_output = {
-        let (out, new_cond) = gnl_total.cond_add(index_bits_val.clone());
+        let (out, new_cond) = gnl_total.cond_add(index_bits_val_m1.clone());
         conds &= new_cond;
         out
     };
-    
+
     let conds = outputs.iter().fold(conds, |conds, input| {
-        conds & input.clone().less_than(gnl_max_output.clone())
+        conds & input.clone().less_equal(gnl_max_output.clone())
     });
 
     println!("Debug problem: {:?}", problem);
