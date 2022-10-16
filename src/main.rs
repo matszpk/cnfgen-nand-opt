@@ -17,20 +17,22 @@
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
-use std::env;
-use std::io::{self, Read};
-use std::fs::File;
-use serde::Deserializer;
-use serde_derive::Deserialize;
 use cnfgen::boolexpr::*;
 use cnfgen::dynintexpr::*;
 use cnfgen::writer::*;
 use exec_sat::*;
+use serde::Deserializer;
+use serde_derive::Deserialize;
+use std::env;
+use std::fs::File;
+use std::io::{self, Read};
 
 #[derive(thiserror::Error, Debug)]
 enum Error {
     #[error("Empty table")]
     EmptyTable,
+    #[error("No layers")]
+    NoLayers,
     #[error("IO error: {0}")]
     IOError(#[from] io::Error),
     #[error("Problem parse error: {0}")]
@@ -74,25 +76,107 @@ struct GenSolution {
 
 fn generate_cnf(problem: Problem) -> Result<GenSolution, Error> {
     let creator = ExprCreator::<isize>::new();
-    
+
     if problem.table.is_empty() {
         return Err(Error::EmptyTable);
     }
-    
-    let value_bits = u64::BITS - problem.table.iter().max()
-            .unwrap().leading_zeros();
+
+    if problem.layers == 0 {
+        return Err(Error::NoLayers);
+    }
+
+    let value_bits = u64::BITS - problem.table.iter().max().unwrap().leading_zeros();
     let index_bits = calc_log_2(problem.table.len());
+    let index_bits_bits = calc_log_2(index_bits);
     let gate_num_bits = calc_log_2(problem.max_gates);
+    let input_num_bits = calc_log_2(problem.max_gates + index_bits);
+
+    let gate_num_for_layers = (0..problem.layers)
+        .into_iter()
+        .map(|i| UDynExprNode::variable(creator.clone(), gate_num_bits))
+        .collect::<Vec<_>>();
+
+    // generate sum of number gates for layers
+    let first_gate_num_for_layers = gate_num_for_layers.first().unwrap().clone();
+    let mut gnl_subsums = vec![first_gate_num_for_layers.clone()];
+    let (num, conds) = gate_num_for_layers.into_iter().skip(1).fold(
+        (
+            first_gate_num_for_layers,
+            BoolExprNode::single_value(creator.clone(), true),
+        ),
+        |(last_num, last_cond), num| {
+            let (new_num, new_cond) = last_num.cond_add(num);
+            gnl_subsums.push(new_num.clone());
+            (new_num, last_cond & new_cond)
+        },
+    );
+    let conds = conds
+        & num.less_equal(
+            UDynExprNode::try_constant_n(creator.clone(), gate_num_bits, problem.max_gates)
+                .unwrap(),
+        );
+    let gnl_total = gnl_subsums.pop().unwrap();
+
+    let first_layer_inputs = (0..problem.max_gates)
+        .into_iter()
+        .map(|i| UDynExprNode::variable(creator.clone(), index_bits_bits))
+        .collect::<Vec<_>>();
+
+    // force index bit number for first input in range
+    let max_index_bit =
+        UDynExprNode::try_constant_n(creator.clone(), index_bits_bits, index_bits - 1).unwrap();
+    let conds = first_layer_inputs.iter().fold(conds, |conds, input| {
+        conds & input.clone().less_equal(max_index_bit.clone())
+    });
+
+    let next_layer_inputs = (0..(problem.max_gates * (problem.layers - 1)))
+        .into_iter()
+        .map(|i| UDynExprNode::variable(creator.clone(), input_num_bits))
+        .collect::<Vec<_>>();
+
+    let index_bits_val =
+        UDynExprNode::try_constant_n(creator.clone(), input_num_bits, index_bits).unwrap();
+    let mut conds = conds.clone();
+    let max_layer_inputs = gnl_subsums
+        .into_iter()
+        .map(|num| {
+            let (out, new_cond) = num.cond_add(index_bits_val.clone());
+            conds &= new_cond;
+            out
+        })
+        .collect::<Vec<_>>();
+
+    // force next_layer_inputs in range 0..(index_bits+prev_layers_inputs)
+    for i in 0..(problem.layers - 1) {
+        conds = next_layer_inputs
+            .iter()
+            .skip(problem.max_gates * i)
+            .take(problem.max_gates)
+            .fold(conds, |conds, input| {
+                conds & input.clone().less_than(max_layer_inputs[i].clone())
+            });
+    }
+
+    let outputs = (0..value_bits)
+        .into_iter()
+        .map(|i| UDynExprNode::variable(creator.clone(), input_num_bits))
+        .collect::<Vec<_>>();
     
-    let gate_num_for_layers = (0..(problem.layers * gate_num_bits)).into_iter().map(|i|
-            UDynExprNode::variable(creator.clone(), gate_num_bits));
+    let gnl_max_output = {
+        let (out, new_cond) = gnl_total.cond_add(index_bits_val.clone());
+        conds &= new_cond;
+        out
+    };
     
-    //(0..(index_bits * problem.gates)).into_iter()
-      //      .map(|i| UDynExprNode::variable(creator.clone(), index_bits);
-    
+    let conds = first_layer_inputs.iter().fold(conds, |conds, input| {
+        conds & input.clone().less_than(gnl_max_output.clone())
+    });
+
     println!("Debug problem: {:?}", problem);
     println!("Value bits: {}, Index bits: {}", value_bits, index_bits);
-    
+
+    for (idx, value) in problem.table.into_iter().enumerate() {}
+
     Err(io::Error::new(io::ErrorKind::Other, "oh no!").into())
 }
 
@@ -122,7 +206,10 @@ fn main() -> Result<(), Error> {
             "check" => {
                 let sat_output = args.next();
                 let (problem, sat_output) = if let Some(sat_output) = sat_output {
-                    (read_problem(File::open(problem_path.unwrap())?)?, sat_output)
+                    (
+                        read_problem(File::open(problem_path.unwrap())?)?,
+                        sat_output,
+                    )
                 } else {
                     (read_problem(io::stdin())?, problem_path.unwrap())
                 };
