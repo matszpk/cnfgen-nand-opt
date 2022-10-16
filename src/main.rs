@@ -106,7 +106,7 @@ fn generate_cnf(problem: Problem) -> Result<GenSolution, Error> {
         ),
         |(last_num, last_cond), num| {
             let (new_num, new_cond) = last_num.cond_add(num);
-            gnl_subsums.push(new_num.clone());
+            gnl_subsums.push(UDynExprNode::try_from_n(new_num.clone(), input_num_bits).unwrap());
             (new_num, last_cond & new_cond)
         },
     );
