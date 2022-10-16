@@ -46,8 +46,8 @@ enum GateType {
 #[derive(Deserialize, Debug)]
 struct Problem {
     pub gate: GateType,
-    pub layers: u32,
-    pub max_gates: u32,
+    pub layers: usize,
+    pub max_gates: usize,
     pub table: Vec<u64>,
 }
 
@@ -55,6 +55,15 @@ fn read_problem(mut reader: impl Read) -> Result<Problem, Error> {
     let mut content = String::new();
     reader.read_to_string(&mut content)?;
     Ok(toml::from_str(&content)?)
+}
+
+const fn calc_log_2(n: usize) -> usize {
+    let nbits = usize::BITS - n.leading_zeros();
+    if (1 << (nbits - 1)) == n {
+        (nbits - 1) as usize
+    } else {
+        nbits as usize
+    }
 }
 
 struct GenSolution {
@@ -72,11 +81,14 @@ fn generate_cnf(problem: Problem) -> Result<GenSolution, Error> {
     
     let value_bits = u64::BITS - problem.table.iter().max()
             .unwrap().leading_zeros();
-    let mut index_bits = usize::BITS as usize -
-            (problem.table.len().leading_zeros() as usize);
-    if problem.table.len() == (1usize<<(index_bits-1)) {
-        index_bits -= 1;
-    }
+    let index_bits = calc_log_2(problem.table.len());
+    let gate_num_bits = calc_log_2(problem.max_gates);
+    
+    let gate_num_for_layers = (0..(problem.layers * gate_num_bits)).into_iter().map(|i|
+            UDynExprNode::variable(creator.clone(), gate_num_bits));
+    
+    //(0..(index_bits * problem.gates)).into_iter()
+      //      .map(|i| UDynExprNode::variable(creator.clone(), index_bits);
     
     println!("Debug problem: {:?}", problem);
     println!("Value bits: {}, Index bits: {}", value_bits, index_bits);
