@@ -168,7 +168,7 @@ fn generate_cnf(problem: Problem) -> Result<GenSolution, Error> {
         out
     };
     
-    let conds = first_layer_inputs.iter().fold(conds, |conds, input| {
+    let conds = outputs.iter().fold(conds, |conds, input| {
         conds & input.clone().less_than(gnl_max_output.clone())
     });
 
