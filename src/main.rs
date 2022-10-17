@@ -277,7 +277,7 @@ fn generate_cnf(problem: Problem) -> Result<GenSolution, Error> {
             .flatten()
             .cloned()
             .collect::<Vec<_>>(),
-        output: all_layer_inputs.last().unwrap().clone(),
+        output: outputs,
     })
 }
 
