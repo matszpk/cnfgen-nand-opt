@@ -70,7 +70,7 @@ const fn calc_log_2(n: usize) -> usize {
 
 struct GenSolution {
     expr: BoolExprNode<isize>,
-    gates_input: Vec<UDynExprNode<isize>>,
+    gates_input: Vec<Vec<UDynExprNode<isize>>>,
     output: Vec<UDynExprNode<isize>>,
 }
 
@@ -272,17 +272,13 @@ fn generate_cnf(problem: Problem) -> Result<GenSolution, Error> {
 
     Ok(GenSolution {
         expr: conds,
-        gates_input: all_layer_inputs
-            .iter()
-            .flatten()
-            .cloned()
-            .collect::<Vec<_>>(),
+        gates_input: all_layer_inputs,
         output: outputs,
     })
 }
 
 struct Solution {
-    gates_input: Vec<usize>,
+    gates_input: Vec<Vec<usize>>,
     output: Vec<usize>,
 }
 
@@ -301,13 +297,30 @@ fn get_solution(gen: &GenSolution, assignment: &[bool]) -> Solution {
         gates_input: gen
             .gates_input
             .iter()
-            .map(|x| get_value_from_dynintexpr_node(x, assignment))
+            .map(|v| {
+                v.iter()
+                    .map(|x| get_value_from_dynintexpr_node(x, assignment))
+                    .collect::<Vec<_>>()
+            })
             .collect::<Vec<_>>(),
         output: gen
             .output
             .iter()
             .map(|x| get_value_from_dynintexpr_node(x, assignment))
             .collect::<Vec<_>>(),
+    }
+}
+
+fn print_solution(sol: &Solution) {
+    for (i, l) in sol.gates_input.iter().enumerate() {
+        println!("Layer {}:\n", i);
+        for ii in l {
+            println!("  {}\n", ii);
+        }
+    }
+    println!("Output:\n");
+    for ii in &sol.output {
+        println!("  {}\n", ii);
     }
 }
 
