@@ -103,6 +103,7 @@ fn generate_cnf(problem: Problem) -> Result<GenSolution, Error> {
         .iter()
         .map(|x| calc_log_2(*x))
         .collect::<Vec<_>>();
+
     let mut max_input_indexes = vec![index_bits];
     for i in &max_gates_per_layer {
         max_input_indexes.push(max_input_indexes.last().unwrap() + i);
