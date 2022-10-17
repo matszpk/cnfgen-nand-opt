@@ -251,12 +251,19 @@ fn generate_cnf(problem: Problem) -> Result<GenSolution, Error> {
         for l in 0..problem.layers {
             gen_gates(&all_layer_inputs[l], l);
         }
-
-        let output = UDynExprNode::from_boolexprs(
-            all_inputs[all_inputs.len() - value_bits..]
-                .iter()
-                .map(|x| x.bit(0)),
+        // output
+        let mut input_table = all_inputs.clone();
+        // extend for dynint_table - rest is false
+        input_table.extend(
+            (0..((1 << *mii_bits.last().unwrap()) - all_inputs.len()))
+                .into_iter()
+                .map(|_| UDynExprNode::try_constant_n(creator.clone(), 1, 0u8).unwrap())
+                .collect::<Vec<_>>(),
         );
+        let output = UDynExprNode::from_boolexprs(
+            (0..value_bits).into_iter().map(|i|
+                dynint_table(outputs[i].clone(), input_table.clone()).bit(0)));
+        
         conds &=
             output.equal(UDynExprNode::try_constant_n(creator.clone(), value_bits, value).unwrap());
     }
