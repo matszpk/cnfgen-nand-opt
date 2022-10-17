@@ -148,30 +148,25 @@ fn generate_cnf(problem: Problem) -> Result<GenSolution, Error> {
                 .unwrap(),
         );
     //let gnl_total = gnl_subsums.pop().unwrap();
+
     // bits of index_input_ranges values: mii_bits[i]
-    let mut index_input_ends = vec![
-        UDynExprNode::try_constant_n(creator.clone(), mii_bits[0], index_bits-1).unwrap()
-    ];
+    let mut index_input_starts = vec![0];
+    index_input_starts.extend(max_input_indexes);
 
-    for i in 1..problem.layers {
-        let max_range =
-            UDynExprNode::try_from_n(gate_num_for_layers[i].clone(), mii_bits[i]).unwrap();
-        let prev_range =
-            UDynExprNode::try_from_n(index_input_ends[i-1].clone(), mii_bits[i]).unwrap();
-        index_input_ends.push(max_range.mod_add(prev_range));
-    }
-    
-    let mut index_input_starts = vec![
-        UDynExprNode::try_constant_n(creator.clone(), mii_bits[0], 0u8).unwrap(),
-        UDynExprNode::try_constant_n(creator.clone(), mii_bits[1], index_bits).unwrap()
-    ];
+    // bits of index_input_ranges values: mii_bits[i]
+    let mut index_input_ends =
+        vec![UDynExprNode::try_constant_n(creator.clone(), mii_bits[0], index_bits - 1).unwrap()];
 
-    for i in 1..(problem.layers-1) {
-        let max_range =
-            UDynExprNode::try_from_n(gate_num_for_layers[i].clone(), mii_bits[i+1]).unwrap();
-        let prev_range =
-            UDynExprNode::try_from_n(index_input_starts[i-1].clone(), mii_bits[i+1]).unwrap();
-        index_input_starts.push(max_range.mod_add(prev_range));
+    for i in 0..problem.layers {
+        let start_range = UDynExprNode::try_constant_n(
+            creator.clone(),
+            mii_bits[i + 1],
+            index_input_starts[i + 1] - 1,
+        )
+        .unwrap();
+        let gate_num_val =
+            UDynExprNode::try_from_n(gate_num_for_layers[i].clone(), mii_bits[i + 1]).unwrap();
+        index_input_ends.push(start_range.mod_add(gate_num_val));
     }
 
     //     let layer_inputs = vec![];
