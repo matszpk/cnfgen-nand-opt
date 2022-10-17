@@ -147,7 +147,6 @@ fn generate_cnf(problem: Problem) -> Result<GenSolution, Error> {
             UDynExprNode::try_constant_n(creator.clone(), gate_num_bits, problem.max_gates)
                 .unwrap(),
         );
-    //let gnl_total = gnl_subsums.pop().unwrap();
 
     let mut index_input_starts = vec![0];
     index_input_starts.extend(max_input_indexes);
@@ -215,6 +214,45 @@ fn generate_cnf(problem: Problem) -> Result<GenSolution, Error> {
     //
     // println!("Debug problem: {:?}", problem);
     // println!("Value bits: {}, Index bits: {}", value_bits, index_bits);
+
+    for (idx, value) in problem.table.into_iter().enumerate() {
+        let mut all_inputs = (0..index_bits)
+            .into_iter()
+            .map(|i| {
+                UDynExprNode::try_constant_n(creator.clone(), 1, u8::from(idx & (1 << i) != 0))
+                    .unwrap()
+            })
+            .collect::<Vec<_>>();
+        
+        let mut gen_gates = |layer_inputs: &[UDynExprNode<isize>], l: usize| {
+            let mut input_table = all_inputs.clone();
+            // extend for dynint_table - rest is false
+            input_table.extend(
+                (0..((1 << mii_bits[l]) - all_inputs.len()))
+                    .into_iter()
+                    .map(|i| UDynExprNode::try_constant_n(creator.clone(), 1, 0u8).unwrap())
+                    .collect::<Vec<_>>(),
+            );
+        
+            for i in 0..max_gates_per_layer[0] {
+                let aval =
+                    dynint_table(layer_inputs[(i << 1)].clone(), input_table.clone()).bit(0);
+                let bval = dynint_table(
+                    layer_inputs[(i << 1) + 1].clone(),
+                    input_table.clone(),
+                )
+                .bit(0);
+                all_inputs.push(UDynExprNode::from_boolexprs([match problem.gate {
+                    GateType::Nand => !(aval & bval),
+                    GateType::Nor => !(aval | bval),
+                }]));
+            }
+        };
+
+        for l in 0..problem.layers {
+            gen_gates(&all_layer_inputs[l+1], l+1);
+        }
+    }
     //
     // for (idx, value) in problem.table.into_iter().enumerate() {
     //     // generate first gates
