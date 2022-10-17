@@ -272,7 +272,7 @@ fn generate_cnf(problem: Problem) -> Result<GenSolution, Error> {
 
     Ok(GenSolution {
         expr: conds,
-        gates_input: all_layer_inputs[0..all_layer_inputs.len()]
+        gates_input: all_layer_inputs
             .iter()
             .flatten()
             .cloned()
