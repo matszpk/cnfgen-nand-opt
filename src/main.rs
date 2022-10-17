@@ -88,7 +88,7 @@ fn generate_cnf(problem: Problem) -> Result<GenSolution, Error> {
     let value_bits = (u64::BITS - problem.table.iter().max().unwrap().leading_zeros()) as usize;
     let index_bits = calc_log_2(problem.table.len());
     let index_bits_bits = calc_log_2(index_bits);
-    let gate_num_bits = calc_log_2(problem.max_gates);
+    let gate_num_bits = (usize::BITS - problem.max_gates.leading_zeros()) as usize;
     let input_num_bits = calc_log_2(problem.max_gates + index_bits);
 
     let mut max_gates_per_layer = vec![std::cmp::min(problem.max_gates, value_bits)];
