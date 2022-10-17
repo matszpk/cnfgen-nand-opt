@@ -261,9 +261,11 @@ fn generate_cnf(problem: Problem) -> Result<GenSolution, Error> {
                 .collect::<Vec<_>>(),
         );
         let output = UDynExprNode::from_boolexprs(
-            (0..value_bits).into_iter().map(|i|
-                dynint_table(outputs[i].clone(), input_table.clone()).bit(0)));
-        
+            (0..value_bits)
+                .into_iter()
+                .map(|i| dynint_table(outputs[i].clone(), input_table.clone()).bit(0)),
+        );
+
         conds &=
             output.equal(UDynExprNode::try_constant_n(creator.clone(), value_bits, value).unwrap());
     }
