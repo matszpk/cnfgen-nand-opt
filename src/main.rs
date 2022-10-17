@@ -281,6 +281,30 @@ fn generate_cnf(problem: Problem) -> Result<GenSolution, Error> {
     })
 }
 
+struct Solution {
+    gates_input: Vec<usize>,
+    output: Vec<usize>,
+}
+
+fn get_value_from_dynintexpr_node(intnode: &UDynExprNode<isize>, assignment: &[bool]) -> usize {
+    (0..intnode.len())
+        .into_iter()
+        .map(|i| {
+            let varlit = intnode.bit(i).varlit().unwrap();
+            usize::from(assignment[varlit.checked_abs().unwrap() as usize] ^ (varlit < 0)) << i
+        })
+        .sum()
+}
+
+fn get_solution(gen: &GenSolution, assignment: &[bool]) -> Solution {
+    Solution {
+        gates_input: gen.gates_input.iter().map(|x| get_value_from_dynintexpr_node(x, assignment))
+                    .collect::<Vec<_>>(),
+        output: gen.output.iter().map(|x| get_value_from_dynintexpr_node(x, assignment))
+                    .collect::<Vec<_>>(),
+    }
+}
+
 fn main() -> Result<(), Error> {
     let mut args = env::args();
     args.next().unwrap();
