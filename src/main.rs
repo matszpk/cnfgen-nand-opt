@@ -234,7 +234,7 @@ fn generate_cnf(problem: Problem) -> Result<GenSolution, Error> {
                     .collect::<Vec<_>>(),
             );
         
-            for i in 0..max_gates_per_layer[0] {
+            for i in 0..max_gates_per_layer[l] {
                 let aval =
                     dynint_table(layer_inputs[(i << 1)].clone(), input_table.clone()).bit(0);
                 let bval = dynint_table(
@@ -250,7 +250,7 @@ fn generate_cnf(problem: Problem) -> Result<GenSolution, Error> {
         };
 
         for l in 0..problem.layers {
-            gen_gates(&all_layer_inputs[l+1], l+1);
+            gen_gates(&all_layer_inputs[l], l);
         }
     }
     //
