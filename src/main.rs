@@ -298,10 +298,16 @@ fn get_value_from_dynintexpr_node(intnode: &UDynExprNode<isize>, assignment: &[b
 
 fn get_solution(gen: &GenSolution, assignment: &[bool]) -> Solution {
     Solution {
-        gates_input: gen.gates_input.iter().map(|x| get_value_from_dynintexpr_node(x, assignment))
-                    .collect::<Vec<_>>(),
-        output: gen.output.iter().map(|x| get_value_from_dynintexpr_node(x, assignment))
-                    .collect::<Vec<_>>(),
+        gates_input: gen
+            .gates_input
+            .iter()
+            .map(|x| get_value_from_dynintexpr_node(x, assignment))
+            .collect::<Vec<_>>(),
+        output: gen
+            .output
+            .iter()
+            .map(|x| get_value_from_dynintexpr_node(x, assignment))
+            .collect::<Vec<_>>(),
     }
 }
 
