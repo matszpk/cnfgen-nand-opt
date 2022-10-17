@@ -160,11 +160,13 @@ fn generate_cnf(problem: Problem) -> Result<GenSolution, Error> {
         let start_range = UDynExprNode::try_constant_n(
             creator.clone(),
             mii_bits[i + 1],
+            // for start...=max - we must subtract 1
             index_input_starts[i + 1] - 1,
         )
         .unwrap();
         let gate_num_val =
             UDynExprNode::try_from_n(gate_num_for_layers[i].clone(), mii_bits[i + 1]).unwrap();
+        // NG(N) + I0+GMAx0+GMax1 ... GMax(N-1)-1
         index_input_ends.push(start_range.mod_add(gate_num_val));
     }
 
@@ -188,8 +190,8 @@ fn generate_cnf(problem: Problem) -> Result<GenSolution, Error> {
                 .unwrap();
                 let lrange_end =
                     UDynExprNode::try_from_n(index_input_ends[l].clone(), mii_bits[l]).unwrap();
-                li_range_cond = li_range_cond
-                    | (li.clone().greater_equal(lrange_start) & li.clone().less_equal(lrange_end));
+                li_range_cond |=
+                    (li.clone().greater_equal(lrange_start) & li.clone().less_equal(lrange_end));
             }
             conds &= li_range_cond;
         }
