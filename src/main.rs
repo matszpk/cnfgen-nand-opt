@@ -149,7 +149,6 @@ fn generate_cnf(problem: Problem) -> Result<GenSolution, Error> {
         );
     //let gnl_total = gnl_subsums.pop().unwrap();
 
-    // bits of index_input_ranges values: mii_bits[i]
     let mut index_input_starts = vec![0];
     index_input_starts.extend(max_input_indexes);
 
@@ -169,78 +168,50 @@ fn generate_cnf(problem: Problem) -> Result<GenSolution, Error> {
         index_input_ends.push(start_range.mod_add(gate_num_val));
     }
 
-    //     let layer_inputs = vec![];
-    //
-    //     let mut conds = conds;
-    //     for l in 0..problem.layers {
-    //         let layer_inputs = (0..(max_gates_per_layer[l] << 1))
-    //             .into_iter()
-    //             .map(|i| UDynExprNode::variable(creator.clone(), index_bits_bits))
-    //             .collect::<Vec<_>>();
-    //         // required ranges for input indexes
-    //         // GNX - gates_num_for_layers[X], MGX = max_gates_per_layer[X]
-    //         // layer 0 inputs: 0..I
-    //         // layer 1 inputs: 0..I, I..I+GN0
-    //         // layer 2 inputs: 0..I, I..I+GN0, I+MG0..I+MG0+GN1
-    //         // layer 3 inputs: 0..I, I..I+GN0, I+MG0..I+MG0+GN1, I+MG0+MG2..I+MG0+MG1+GN2
-    //         //conds &=
-    //     }
+    // create indexes of input layers
+    let mut all_layer_inputs = vec![];
+    let mut conds = conds;
 
-    // let first_layer_inputs = (0..(max_gates_per_layer[0] << 1))
-    //     .into_iter()
-    //     .map(|i| UDynExprNode::variable(creator.clone(), index_bits_bits))
-    //     .collect::<Vec<_>>();
-    //
-    // // force index bit number for first input in range
-    // let max_index_bit =
-    //     UDynExprNode::try_constant_n(creator.clone(), index_bits_bits, index_bits - 1).unwrap();
-    // let conds = first_layer_inputs.iter().fold(conds, |conds, input| {
-    //     conds & input.clone().less_equal(max_index_bit.clone())
-    // });
-    //
-    // let next_layer_inputs = (0..((problem.max_gates << 1) * (problem.layers - 1)))
-    //     .into_iter()
-    //     .map(|i| UDynExprNode::variable(creator.clone(), input_num_bits))
-    //     .collect::<Vec<_>>();
-    //
-    // let index_bits_val_m1 =
-    //     UDynExprNode::try_constant_n(creator.clone(), input_num_bits, index_bits - 1).unwrap();
-    // let mut conds = conds.clone();
-    // let max_layer_inputs = gnl_subsums
-    //     .into_iter()
-    //     .map(|num| {
-    //         let (out, new_cond) = num.cond_add(index_bits_val_m1.clone());
-    //         conds &= new_cond;
-    //         out
-    //     })
-    //     .collect::<Vec<_>>();
-    //
-    // // force next_layer_inputs in range 0..(index_bits+prev_layers_inputs)
-    // for i in 0..(problem.layers - 1) {
-    //     conds = next_layer_inputs
-    //         .iter()
-    //         .skip(problem.max_gates * i)
-    //         .take(problem.max_gates)
-    //         .fold(conds, |conds, input| {
-    //             conds & input.clone().less_equal(max_layer_inputs[i].clone())
-    //         });
-    // }
-    //
-    // let outputs = (0..value_bits)
-    //     .into_iter()
-    //     .map(|i| UDynExprNode::variable(creator.clone(), input_num_bits))
-    //     .collect::<Vec<_>>();
-    //
-    // let gnl_max_output = {
-    //     let (out, new_cond) = gnl_total.cond_add(index_bits_val_m1.clone());
-    //     conds &= new_cond;
-    //     out
-    // };
-    //
-    // // force outputs in range 0..(index_bits+layer_inputs)
-    // let conds = outputs.iter().fold(conds, |conds, input| {
-    //     conds & input.clone().less_equal(gnl_max_output.clone())
-    // });
+    // helper to generate conditions for indexes of input or outputs
+    let mut gen_conditions = |inputs: &[UDynExprNode<isize>], l: usize| {
+        for li in inputs {
+            // set up conditions for indexes of input from previous layers
+            let lrange_end =
+                UDynExprNode::try_from_n(index_input_ends[0].clone(), mii_bits[l]).unwrap();
+            let mut li_range_cond = li.clone().less_equal(lrange_end);
+            for ll in 1..l {
+                let lrange_start = UDynExprNode::try_constant_n(
+                    creator.clone(),
+                    mii_bits[l],
+                    index_input_starts[ll].clone(),
+                )
+                .unwrap();
+                let lrange_end =
+                    UDynExprNode::try_from_n(index_input_ends[l].clone(), mii_bits[l]).unwrap();
+                li_range_cond = li_range_cond
+                    | (li.clone().greater_equal(lrange_start) & li.clone().less_equal(lrange_end));
+            }
+            conds &= li_range_cond;
+        }
+    };
+
+    for l in 0..problem.layers {
+        let layer_inputs = (0..(max_gates_per_layer[l] << 1))
+            .into_iter()
+            .map(|i| UDynExprNode::variable(creator.clone(), mii_bits[l]))
+            .collect::<Vec<_>>();
+        // start from input of layer 0 - indexes
+        gen_conditions(&layer_inputs, l);
+        all_layer_inputs.push(layer_inputs);
+    }
+
+    // indexes of output layer
+    let outputs = (0..*max_gates_per_layer.last().unwrap())
+        .into_iter()
+        .map(|i| UDynExprNode::variable(creator.clone(), *mii_bits.last().unwrap()))
+        .collect::<Vec<_>>();
+    gen_conditions(&outputs, problem.layers);
+
     //
     // println!("Debug problem: {:?}", problem);
     // println!("Value bits: {}, Index bits: {}", value_bits, index_bits);
