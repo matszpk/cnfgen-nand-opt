@@ -91,7 +91,7 @@ fn generate_cnf(problem: Problem) -> Result<GenSolution, Error> {
     let gate_num_bits = calc_log_2(problem.max_gates);
     let input_num_bits = calc_log_2(problem.max_gates + index_bits);
 
-    let mut max_gates_per_layer = vec![value_bits];
+    let mut max_gates_per_layer = vec![std::cmp::min(problem.max_gates, value_bits)];
     for i in 0..(problem.layers - 1) {
         max_gates_per_layer.push(std::cmp::min(
             problem.max_gates,
@@ -197,7 +197,7 @@ fn generate_cnf(problem: Problem) -> Result<GenSolution, Error> {
     for l in 0..problem.layers {
         let layer_inputs = (0..(max_gates_per_layer[l] << 1))
             .into_iter()
-            .map(|i| UDynExprNode::variable(creator.clone(), mii_bits[l]))
+            .map(|_| UDynExprNode::variable(creator.clone(), mii_bits[l]))
             .collect::<Vec<_>>();
         // start from input of layer 0 - indexes
         gen_conditions(&layer_inputs, l);
@@ -223,25 +223,21 @@ fn generate_cnf(problem: Problem) -> Result<GenSolution, Error> {
                     .unwrap()
             })
             .collect::<Vec<_>>();
-        
+
         let mut gen_gates = |layer_inputs: &[UDynExprNode<isize>], l: usize| {
             let mut input_table = all_inputs.clone();
             // extend for dynint_table - rest is false
             input_table.extend(
                 (0..((1 << mii_bits[l]) - all_inputs.len()))
                     .into_iter()
-                    .map(|i| UDynExprNode::try_constant_n(creator.clone(), 1, 0u8).unwrap())
+                    .map(|_| UDynExprNode::try_constant_n(creator.clone(), 1, 0u8).unwrap())
                     .collect::<Vec<_>>(),
             );
-        
+
             for i in 0..max_gates_per_layer[l] {
-                let aval =
-                    dynint_table(layer_inputs[(i << 1)].clone(), input_table.clone()).bit(0);
-                let bval = dynint_table(
-                    layer_inputs[(i << 1) + 1].clone(),
-                    input_table.clone(),
-                )
-                .bit(0);
+                let aval = dynint_table(layer_inputs[(i << 1)].clone(), input_table.clone()).bit(0);
+                let bval =
+                    dynint_table(layer_inputs[(i << 1) + 1].clone(), input_table.clone()).bit(0);
                 all_inputs.push(UDynExprNode::from_boolexprs([match problem.gate {
                     GateType::Nand => !(aval & bval),
                     GateType::Nor => !(aval | bval),
@@ -252,34 +248,25 @@ fn generate_cnf(problem: Problem) -> Result<GenSolution, Error> {
         for l in 0..problem.layers {
             gen_gates(&all_layer_inputs[l], l);
         }
-    }
-    //
-    // for (idx, value) in problem.table.into_iter().enumerate() {
-    //     // generate first gates
-    //     let first_inputs = (0..(1 << index_bits_bits))
-    //         .into_iter()
-    //         .map(|i| {
-    //             UDynExprNode::try_constant_n(creator.clone(), 1, u8::from(idx & (1 << i) != 0))
-    //                 .unwrap()
-    //         })
-    //         .collect::<Vec<_>>();
-    //     let mut inputs = first_inputs.clone();
-    //     for i in 0..problem.max_gates {
-    //         let aval =
-    //             dynint_table(first_layer_inputs[(i << 1)].clone(), first_inputs.clone()).bit(0);
-    //         let bval = dynint_table(
-    //             first_layer_inputs[(i << 1) + 1].clone(),
-    //             first_inputs.clone(),
-    //         )
-    //         .bit(0);
-    //         inputs.push(UDynExprNode::from_boolexprs([match problem.gate {
-    //             GateType::Nand => !(aval & bval),
-    //             GateType::Nor => !(aval | bval),
-    //         }]));
-    //     }
-    // }
 
-    Err(io::Error::new(io::ErrorKind::Other, "oh no!").into())
+        let output = UDynExprNode::from_boolexprs(
+            all_inputs[all_inputs.len() - value_bits..]
+                .iter()
+                .map(|x| x.bit(0)),
+        );
+        conds &=
+            output.equal(UDynExprNode::try_constant_n(creator.clone(), value_bits, value).unwrap());
+    }
+
+    Ok(GenSolution {
+        expr: conds,
+        gates_input: all_layer_inputs[0..all_layer_inputs.len()]
+            .iter()
+            .flatten()
+            .cloned()
+            .collect::<Vec<_>>(),
+        output: all_layer_inputs.last().unwrap().clone(),
+    })
 }
 
 fn main() -> Result<(), Error> {
