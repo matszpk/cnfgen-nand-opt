@@ -192,7 +192,7 @@ fn generate_formulae(problem: &Problem) -> Result<GenSolution, Error> {
                 let lrange_end =
                     UDynExprNode::try_from_n(index_input_ends[l].clone(), mii_bits[l]).unwrap();
                 li_range_cond |=
-                    (li.clone().greater_equal(lrange_start) & li.clone().less_equal(lrange_end));
+                    li.clone().greater_equal(lrange_start) & li.clone().less_equal(lrange_end);
             }
             conds &= li_range_cond;
         }
@@ -328,7 +328,7 @@ fn get_layer_and_input_id(sol: &Solution, value_bits: usize, input: usize) -> (u
         if input < (gi.len() >> 1) {
             return (l, input);
         } else {
-            input -= (gi.len() >> 1);
+            input -= gi.len() >> 1;
         }
     }
     return (sol.gates_input.len(), input);
@@ -345,6 +345,23 @@ fn print_solution(sol: &Solution, value_bits: usize) {
     for ii in &sol.output {
         println!("  {:?}\n", get_layer_and_input_id(sol, value_bits, *ii));
     }
+}
+
+fn check_solution(sol: &Solution, problem: &Problem) -> bool {
+    let value_bits = (u64::BITS - problem.table.iter().max().unwrap().leading_zeros()) as usize;
+    let mut max_input_indexes = vec![value_bits];
+    for i in 0..problem.layers {
+        max_input_indexes.push(max_input_indexes[i] + (sol.gates_input[i].len()>>1));
+    }
+    
+    let mut gates_output = sol.gates_input.iter().map(|x| vec![false; x.len()>>1])
+            .collect::<Vec<_>>();
+    for value in &problem.table {
+        gates_output.iter_mut().for_each(|x| x.fill(false));
+        // first input
+        //for 
+    }
+    false
 }
 
 fn main() -> Result<(), Error> {
