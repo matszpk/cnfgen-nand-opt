@@ -115,7 +115,7 @@ fn generate_formulae(problem: &Problem) -> Result<GenSolution, Error> {
         .map(|x| calc_log_2(*x))
         .collect::<Vec<_>>();
 
-    println!(
+    eprintln!(
         "{:?} {:?} {:?}",
         max_gates_per_layer, max_input_indexes, mii_bits
     );
@@ -217,8 +217,8 @@ fn generate_formulae(problem: &Problem) -> Result<GenSolution, Error> {
     gen_conditions(&outputs, problem.layers);
 
     //
-    // println!("Debug problem: {:?}", problem);
-    // println!("Value bits: {}, Index bits: {}", value_bits, index_bits);
+    // eprintln!("Debug problem: {:?}", problem);
+    // eprintln!("Value bits: {}, Index bits: {}", value_bits, index_bits);
 
     for (idx, value) in problem.table.iter().enumerate() {
         let mut all_inputs = (0..index_bits)
