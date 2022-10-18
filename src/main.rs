@@ -74,7 +74,7 @@ struct GenSolution {
     output: Vec<UDynExprNode<isize>>,
 }
 
-fn generate_cnf(problem: Problem) -> Result<GenSolution, Error> {
+fn generate_formulae(problem: &Problem) -> Result<GenSolution, Error> {
     let creator = ExprCreator::<isize>::new();
 
     if problem.table.is_empty() {
@@ -218,7 +218,7 @@ fn generate_cnf(problem: Problem) -> Result<GenSolution, Error> {
     // println!("Debug problem: {:?}", problem);
     // println!("Value bits: {}, Index bits: {}", value_bits, index_bits);
 
-    for (idx, value) in problem.table.into_iter().enumerate() {
+    for (idx, value) in problem.table.iter().enumerate() {
         let mut all_inputs = (0..index_bits)
             .into_iter()
             .map(|i| {
@@ -266,8 +266,8 @@ fn generate_cnf(problem: Problem) -> Result<GenSolution, Error> {
                 .map(|i| dynint_table(outputs[i].clone(), input_table.clone()).bit(0)),
         );
 
-        conds &=
-            output.equal(UDynExprNode::try_constant_n(creator.clone(), value_bits, value).unwrap());
+        conds &= output
+            .equal(UDynExprNode::try_constant_n(creator.clone(), value_bits, *value).unwrap());
     }
 
     Ok(GenSolution {
@@ -311,16 +311,31 @@ fn get_solution(gen: &GenSolution, assignment: &[bool]) -> Solution {
     }
 }
 
-fn print_solution(sol: &Solution) {
+fn get_layer_and_input_id(sol: &Solution, value_bits: usize, input: usize) -> (usize, usize) {
+    if input < value_bits {
+        return (0, input);
+    }
+    let mut input = input - value_bits;
+    for (l, gi) in sol.gates_input.iter().enumerate() {
+        if input < (gi.len() >> 1) {
+            return (l, input);
+        } else {
+            input -= (gi.len() >> 1);
+        }
+    }
+    return (sol.gates_input.len(), input);
+}
+
+fn print_solution(sol: &Solution, value_bits: usize) {
     for (i, l) in sol.gates_input.iter().enumerate() {
         println!("Layer {}:\n", i);
         for ii in l {
-            println!("  {}\n", ii);
+            println!("  {:?}\n", get_layer_and_input_id(sol, value_bits, *ii));
         }
     }
     println!("Output:\n");
     for ii in &sol.output {
-        println!("  {}\n", ii);
+        println!("  {:?}\n", get_layer_and_input_id(sol, value_bits, *ii));
     }
 }
 
@@ -338,7 +353,7 @@ fn main() -> Result<(), Error> {
                 } else {
                     read_problem(io::stdin())?
                 };
-                generate_cnf(problem)?;
+                generate_formulae(&problem)?;
             }
             "execute" => {
                 let problem = if let Some(problem_path) = problem_path {
