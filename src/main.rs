@@ -335,6 +335,7 @@ fn get_layer_and_input_id(sol: &Solution, value_bits: usize, input: usize) -> (u
 }
 
 fn print_solution(sol: &Solution, value_bits: usize) {
+    println!("Gate number for layers: {:?}", sol.gate_num_for_layers);
     for (i, l) in sol.gates_input.iter().enumerate() {
         println!("Layer {}:\n", i);
         for ii in l.iter().take(sol.gate_num_for_layers[i]) {
@@ -349,19 +350,43 @@ fn print_solution(sol: &Solution, value_bits: usize) {
 
 fn check_solution(sol: &Solution, problem: &Problem) -> bool {
     let value_bits = (u64::BITS - problem.table.iter().max().unwrap().leading_zeros()) as usize;
-    let mut max_input_indexes = vec![value_bits];
+    let index_bits = calc_log_2(problem.table.len());
+    let mut max_input_indexes = vec![index_bits];
     for i in 0..problem.layers {
-        max_input_indexes.push(max_input_indexes[i] + (sol.gates_input[i].len()>>1));
+        max_input_indexes.push(max_input_indexes[i] + (sol.gates_input[i].len() >> 1));
     }
-    
-    let mut gates_output = sol.gates_input.iter().map(|x| vec![false; x.len()>>1])
-            .collect::<Vec<_>>();
+
+    let mut gates_output = vec![false; *max_input_indexes.last().unwrap()];
     for value in &problem.table {
-        gates_output.iter_mut().for_each(|x| x.fill(false));
+        gates_output.fill(false);
         // first input
-        //for 
+        for i in 0..index_bits {
+            gates_output[i] = (value & (1 << i)) != 0;
+        }
+
+        for (l, layer_inputs) in sol.gates_input.iter().enumerate() {
+            let start_index = max_input_indexes[l];
+            for i in 0..(sol.gates_input[l].len() >> 1) {
+                let a = gates_output[layer_inputs[i << 1]];
+                let b = gates_output[layer_inputs[(i << 1) + 1]];
+                gates_output[start_index + i] = match problem.gate {
+                    GateType::Nand => !(a & b),
+                    GateType::Nor => !(a | b),
+                };
+            }
+        }
+
+        let exp_value: u64 = sol
+            .output
+            .iter()
+            .enumerate()
+            .map(|(i, x)| u64::from(gates_output[*x]) << i)
+            .sum();
+        if exp_value != *value {
+            return false;
+        }
     }
-    false
+    true
 }
 
 fn main() -> Result<(), Error> {
