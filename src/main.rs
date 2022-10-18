@@ -20,12 +20,11 @@
 use cnfgen::boolexpr::*;
 use cnfgen::dynintexpr::*;
 use cnfgen::writer::*;
-use exec_sat::*;
-use serde::Deserializer;
+use exec_sat::{exec_sat_simple, parse_sat_output, SatOutput};
 use serde_derive::Deserialize;
 use std::env;
 use std::fs::File;
-use std::io::{self, Read};
+use std::io::{self, BufReader, Read};
 
 #[derive(thiserror::Error, Debug)]
 enum Error {
@@ -37,6 +36,10 @@ enum Error {
     IOError(#[from] io::Error),
     #[error("Problem parse error: {0}")]
     ParseError(#[from] toml::de::Error),
+    #[error("CNF error: {0}")]
+    CNFError(#[from] CNFError),
+    #[error("ExecSAT error: {0}")]
+    ExecSATError(#[from] exec_sat::Error),
 }
 
 #[derive(Deserialize, Debug)]
@@ -88,9 +91,7 @@ fn generate_formulae(problem: &Problem) -> Result<GenSolution, Error> {
 
     let value_bits = (u64::BITS - problem.table.iter().max().unwrap().leading_zeros()) as usize;
     let index_bits = calc_log_2(problem.table.len());
-    let index_bits_bits = calc_log_2(index_bits);
     let gate_num_bits = (usize::BITS - problem.max_gates.leading_zeros()) as usize;
-    let input_num_bits = calc_log_2(problem.max_gates + index_bits);
 
     let mut max_gates_per_layer = vec![std::cmp::min(problem.max_gates, value_bits)];
     for i in 0..(problem.layers - 1) {
@@ -211,7 +212,7 @@ fn generate_formulae(problem: &Problem) -> Result<GenSolution, Error> {
     // indexes of output layer
     let outputs = (0..*max_gates_per_layer.last().unwrap())
         .into_iter()
-        .map(|i| UDynExprNode::variable(creator.clone(), *mii_bits.last().unwrap()))
+        .map(|_| UDynExprNode::variable(creator.clone(), *mii_bits.last().unwrap()))
         .collect::<Vec<_>>();
     gen_conditions(&outputs, problem.layers);
 
@@ -349,7 +350,6 @@ fn print_solution(sol: &Solution, value_bits: usize) {
 }
 
 fn check_solution(sol: &Solution, problem: &Problem) -> bool {
-    let value_bits = (u64::BITS - problem.table.iter().max().unwrap().leading_zeros()) as usize;
     let index_bits = calc_log_2(problem.table.len());
     let mut max_input_indexes = vec![index_bits];
     for i in 0..problem.layers {
@@ -389,6 +389,31 @@ fn check_solution(sol: &Solution, problem: &Problem) -> bool {
     true
 }
 
+fn check_from_sat_output(sat_output: SatOutput, gen: &GenSolution, problem: &Problem) {
+    match sat_output {
+        SatOutput::Satisfiable(Some(assignment)) => {
+            let sol = get_solution(gen, &assignment);
+            let value_bits =
+                (u64::BITS - problem.table.iter().max().unwrap().leading_zeros()) as usize;
+            print_solution(&sol, value_bits);
+            if check_solution(&sol, problem) {
+                println!("Verification: Solution is correct.");
+            } else {
+                println!("Verification: Solution is incorrect!");
+            }
+        }
+        SatOutput::Satisfiable(None) => {
+            println!("Satisfiable but assignment is unknown");
+        }
+        SatOutput::Unsatisfiable => {
+            println!("Unsatisfiable");
+        }
+        SatOutput::Unknown => {
+            println!("Unknown state");
+        }
+    }
+}
+
 fn main() -> Result<(), Error> {
     let mut args = env::args();
     args.next().unwrap();
@@ -403,7 +428,8 @@ fn main() -> Result<(), Error> {
                 } else {
                     read_problem(io::stdin())?
                 };
-                generate_formulae(&problem)?;
+                let gen_sol = generate_formulae(&problem)?;
+                gen_sol.expr.write(&mut CNFWriter::new(io::stdout()))?;
             }
             "execute" => {
                 let problem = if let Some(problem_path) = problem_path {
@@ -411,6 +437,15 @@ fn main() -> Result<(), Error> {
                 } else {
                     read_problem(io::stdin())?
                 };
+                let gen_sol = generate_formulae(&problem)?;
+                let output = vec![];
+                let mut writer = CNFWriter::new(output);
+                gen_sol.expr.write(&mut writer)?;
+                let sat_output = exec_sat_simple(
+                    env::var("SAT_SOLVER").expect("SAT_SOLVER not set"),
+                    writer.inner().as_slice(),
+                )?;
+                check_from_sat_output(sat_output, &gen_sol, &problem);
             }
             "check" => {
                 let sat_output = args.next();
@@ -422,6 +457,10 @@ fn main() -> Result<(), Error> {
                 } else {
                     (read_problem(io::stdin())?, problem_path.unwrap())
                 };
+                let gen_sol = generate_formulae(&problem)?;
+                let sat_output = File::open(sat_output)?;
+                let sat_output = parse_sat_output(BufReader::new(sat_output))?;
+                check_from_sat_output(sat_output, &gen_sol, &problem);
             }
             "help" | "-h" | "--help" => {
                 println!(
