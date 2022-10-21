@@ -159,6 +159,7 @@ fn generate_formulae(problem: &Problem) -> Result<GenSolution, Error> {
     let mut index_input_ends =
         vec![UDynExprNode::try_constant_n(creator.clone(), mii_bits[0], index_bits - 1).unwrap()];
 
+    let mut conds = conds;
     for i in 0..problem.layers {
         let start_range = UDynExprNode::try_constant_n(
             creator.clone(),
@@ -171,12 +172,13 @@ fn generate_formulae(problem: &Problem) -> Result<GenSolution, Error> {
         let gate_num_val =
             UDynExprNode::try_from_n(gate_num_for_layers[i].clone(), mii_bits[i + 1]).unwrap();
         // NG(N) + I0+GMAx0+GMax1 ... GMax(N-1)-1
-        index_input_ends.push(start_range.mod_add(gate_num_val));
+        let (sum, sconds) = start_range.cond_add(gate_num_val);
+        index_input_ends.push(sum);
+        conds &= sconds;
     }
 
     // create indexes of input layers
     let mut all_layer_inputs = vec![];
-    let mut conds = conds;
 
     // helper to generate conditions for indexes of input or outputs
     let mut gen_conditions = |inputs: &[UDynExprNode<isize>], l: usize| {
@@ -186,10 +188,11 @@ fn generate_formulae(problem: &Problem) -> Result<GenSolution, Error> {
                 UDynExprNode::try_from_n(index_input_ends[0].clone(), mii_bits[l]).unwrap();
             let mut li_range_cond = li.clone().less_equal(lrange_end);
             for ll in 1..=l {
+                eprintln!("xxdebug: {} {} {} {}", l, ll, index_input_starts[ll], mii_bits[l]);
                 let lrange_start = UDynExprNode::try_constant_n(
                     creator.clone(),
                     mii_bits[l],
-                    index_input_starts[ll].clone(),
+                    index_input_starts[ll],
                 )
                 .unwrap();
                 let lrange_end =
@@ -199,6 +202,7 @@ fn generate_formulae(problem: &Problem) -> Result<GenSolution, Error> {
             }
             conds &= li_range_cond;
         }
+        //eprintln!("xccvc c: {:?}", &conds);
     };
 
     for l in 0..problem.layers {
@@ -347,7 +351,7 @@ fn print_solution(sol: &Solution, value_bits: usize) {
     }
     println!("Output:");
     for ii in &sol.output {
-        println!("  {:?}", get_layer_and_input_id(sol, value_bits, *ii));
+        println!("  {:?} {}", get_layer_and_input_id(sol, value_bits, *ii), *ii);
     }
 }
 
