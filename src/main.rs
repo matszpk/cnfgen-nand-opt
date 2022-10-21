@@ -153,6 +153,7 @@ fn generate_formulae(problem: &Problem) -> Result<GenSolution, Error> {
 
     let mut index_input_starts = vec![0];
     index_input_starts.extend(max_input_indexes);
+    eprintln!("index_input_starts: {:?}", index_input_starts);
 
     // bits of index_input_ranges values: mii_bits[i]
     let mut index_input_ends =
@@ -166,6 +167,7 @@ fn generate_formulae(problem: &Problem) -> Result<GenSolution, Error> {
             index_input_starts[i + 1] - 1,
         )
         .unwrap();
+        eprintln!("lrange end s: {} {} {}", i, index_input_starts[i + 1] - 1, mii_bits[i + 1]);
         let gate_num_val =
             UDynExprNode::try_from_n(gate_num_for_layers[i].clone(), mii_bits[i + 1]).unwrap();
         // NG(N) + I0+GMAx0+GMax1 ... GMax(N-1)-1
@@ -183,7 +185,7 @@ fn generate_formulae(problem: &Problem) -> Result<GenSolution, Error> {
             let lrange_end =
                 UDynExprNode::try_from_n(index_input_ends[0].clone(), mii_bits[l]).unwrap();
             let mut li_range_cond = li.clone().less_equal(lrange_end);
-            for ll in 1..l {
+            for ll in 1..=l {
                 let lrange_start = UDynExprNode::try_constant_n(
                     creator.clone(),
                     mii_bits[l],
@@ -338,14 +340,14 @@ fn get_layer_and_input_id(sol: &Solution, value_bits: usize, input: usize) -> (u
 fn print_solution(sol: &Solution, value_bits: usize) {
     println!("Gate number for layers: {:?}", sol.gate_num_for_layers);
     for (i, l) in sol.gates_input.iter().enumerate() {
-        println!("Layer {}:\n", i);
-        for ii in l.iter().take(sol.gate_num_for_layers[i]) {
-            println!("  {:?}\n", get_layer_and_input_id(sol, value_bits, *ii));
+        println!("Layer {}:", i);
+        for ii in l.iter().take(sol.gate_num_for_layers[i]<<1) {
+            println!("  {:?} {}", get_layer_and_input_id(sol, value_bits, *ii), *ii);
         }
     }
-    println!("Output:\n");
+    println!("Output:");
     for ii in &sol.output {
-        println!("  {:?}\n", get_layer_and_input_id(sol, value_bits, *ii));
+        println!("  {:?}", get_layer_and_input_id(sol, value_bits, *ii));
     }
 }
 
@@ -357,11 +359,11 @@ fn check_solution(sol: &Solution, problem: &Problem) -> bool {
     }
 
     let mut gates_output = vec![false; *max_input_indexes.last().unwrap()];
-    for value in &problem.table {
+    for (index, value) in problem.table.iter().enumerate() {
         gates_output.fill(false);
         // first input
         for i in 0..index_bits {
-            gates_output[i] = (value & (1 << i)) != 0;
+            gates_output[i] = (index & (1 << i)) != 0;
         }
 
         for (l, layer_inputs) in sol.gates_input.iter().enumerate() {
