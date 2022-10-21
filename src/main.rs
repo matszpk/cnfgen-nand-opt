@@ -105,7 +105,9 @@ fn generate_formulae(problem: &Problem) -> Result<GenSolution, Error> {
     {
         let mut max_inputs = index_bits;
         for mgpl in max_gates_per_layer.iter_mut() {
-            let max_gates = (max_inputs * (max_inputs - 1)) >> 1;
+            // includes: all pairs of inputs and same gates with this same inputs
+            // n*(n-1)/2 + n, where n is max_inputs.
+            let max_gates = ((max_inputs * (max_inputs - 1)) >> 1) + max_inputs;
             eprintln!("ggg: {}", max_gates);
             if max_gates < *mgpl {
                 *mgpl = max_gates;
