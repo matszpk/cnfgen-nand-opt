@@ -130,7 +130,7 @@ fn generate_formulae(problem: &Problem) -> Result<GenSolution, Error> {
         conds &= val.clone().less_equal(
             UDynExprNode::try_constant_n(creator.clone(), mgpl_bits[i], max_gates_per_layer[i] - 1)
                 .unwrap(),
-        ) & val.clone().nequal(UDynExprNode::filled(creator.clone(), mgpl_bits[i], false));
+        );
     }
 
     // generate sum of number gates for layers
@@ -168,7 +168,7 @@ fn generate_formulae(problem: &Problem) -> Result<GenSolution, Error> {
             index_input_starts[i + 1] - 1,
         )
         .unwrap();
-        eprintln!("lrange end s: {} {} {}", i, index_input_starts[i + 1] - 1, mii_bits[i + 1]);
+        //eprintln!("lrange end s: {} {} {}", i, index_input_starts[i + 1] - 1, mii_bits[i + 1]);
         let gate_num_val =
             UDynExprNode::try_from_n(gate_num_for_layers[i].clone(), mii_bits[i + 1]).unwrap();
         // NG(N) + I0+GMAx0+GMax1 ... GMax(N-1)-1
@@ -186,7 +186,7 @@ fn generate_formulae(problem: &Problem) -> Result<GenSolution, Error> {
                 UDynExprNode::try_from_n(index_input_ends[0].clone(), mii_bits[l]).unwrap();
             let mut li_range_cond = li.clone().less_equal(lrange_end);
             for ll in 1..=l {
-                eprintln!("xxdebug: {} {} {} {}", l, ll, index_input_starts[ll], mii_bits[l]);
+                //eprintln!("xxdebug: {} {} {} {}", l, ll, index_input_starts[ll], mii_bits[l]);
                 let lrange_start = UDynExprNode::try_constant_n(
                     creator.clone(),
                     mii_bits[l],
@@ -194,7 +194,7 @@ fn generate_formulae(problem: &Problem) -> Result<GenSolution, Error> {
                 )
                 .unwrap();
                 let lrange_end =
-                    UDynExprNode::try_from_n(index_input_ends[l].clone(), mii_bits[l]).unwrap();
+                    UDynExprNode::try_from_n(index_input_ends[ll].clone(), mii_bits[l]).unwrap();
                 li_range_cond |=
                     li.clone().greater_equal(lrange_start) & li.clone().less_equal(lrange_end);
             }
