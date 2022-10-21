@@ -130,7 +130,7 @@ fn generate_formulae(problem: &Problem) -> Result<GenSolution, Error> {
         conds &= val.clone().less_equal(
             UDynExprNode::try_constant_n(creator.clone(), mgpl_bits[i], max_gates_per_layer[i] - 1)
                 .unwrap(),
-        );
+        ) & val.clone().nequal(UDynExprNode::filled(creator.clone(), mgpl_bits[i], false));
     }
 
     // generate sum of number gates for layers
@@ -172,9 +172,7 @@ fn generate_formulae(problem: &Problem) -> Result<GenSolution, Error> {
         let gate_num_val =
             UDynExprNode::try_from_n(gate_num_for_layers[i].clone(), mii_bits[i + 1]).unwrap();
         // NG(N) + I0+GMAx0+GMax1 ... GMax(N-1)-1
-        let (sum, sconds) = start_range.cond_add(gate_num_val);
-        index_input_ends.push(sum);
-        conds &= sconds;
+        index_input_ends.push(start_range.mod_add(gate_num_val));
     }
 
     // create indexes of input layers
