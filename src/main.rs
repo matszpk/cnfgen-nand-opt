@@ -324,14 +324,48 @@ fn get_solution(gen: &GenSolution, assignment: &[bool]) -> Solution {
     }
 }
 
-fn get_layer_and_input_id(sol: &Solution, value_bits: usize, input: usize) -> (usize, usize) {
-    if input < value_bits {
+fn check_layer_and_input_id(sol: &Solution, index_bits: usize, input: usize) -> bool {
+    if input < index_bits {
+        true
+    } else {
+        let mut input = input - index_bits;
+        for gi in &sol.gates_input {
+            if input < (gi.len() >> 1) {
+                return true;
+            } else if input >= (gi.len() >> 1) {
+                input -= gi.len() >> 1;
+            } else {
+                return false;
+            }
+        }
+        false
+    }
+}
+
+fn check_data_of_solution(sol: &Solution, index_bits: usize) -> bool {
+    for (i, l) in sol.gates_input.iter().enumerate() {
+        for ii in l.iter().take(sol.gate_num_for_layers[i] << 1) {
+            if !check_layer_and_input_id(sol, index_bits, *ii) {
+                return false;
+            }
+        }
+    }
+    for ii in &sol.output {
+        if !check_layer_and_input_id(sol, index_bits, *ii) {
+            return false;
+        }
+    }
+    return true;
+}
+
+fn get_layer_and_input_id(sol: &Solution, index_bits: usize, input: usize) -> (usize, usize) {
+    if input < index_bits {
         return (0, input);
     }
-    let mut input = input - value_bits;
+    let mut input = input - index_bits;
     for (l, gi) in sol.gates_input.iter().enumerate() {
         if input < (gi.len() >> 1) {
-            return (l, input);
+            return (l + 1, input);
         } else {
             input -= gi.len() >> 1;
         }
@@ -339,17 +373,25 @@ fn get_layer_and_input_id(sol: &Solution, value_bits: usize, input: usize) -> (u
     return (sol.gates_input.len(), input);
 }
 
-fn print_solution(sol: &Solution, value_bits: usize) {
+fn print_solution(sol: &Solution, index_bits: usize) {
     println!("Gate number for layers: {:?}", sol.gate_num_for_layers);
     for (i, l) in sol.gates_input.iter().enumerate() {
-        println!("Layer {}:", i);
-        for ii in l.iter().take(sol.gate_num_for_layers[i]<<1) {
-            println!("  {:?} {}", get_layer_and_input_id(sol, value_bits, *ii), *ii);
+        println!("Layer {}:", i + 1);
+        for ii in l.iter().take(sol.gate_num_for_layers[i] << 1) {
+            println!(
+                "  {:?} {}",
+                get_layer_and_input_id(sol, index_bits, *ii),
+                *ii
+            );
         }
     }
     println!("Output:");
     for ii in &sol.output {
-        println!("  {:?} {}", get_layer_and_input_id(sol, value_bits, *ii), *ii);
+        println!(
+            "  {:?} {}",
+            get_layer_and_input_id(sol, index_bits, *ii),
+            *ii
+        );
     }
 }
 
@@ -397,9 +439,11 @@ fn check_from_sat_output(sat_output: SatOutput, gen: &GenSolution, problem: &Pro
     match sat_output {
         SatOutput::Satisfiable(Some(assignment)) => {
             let sol = get_solution(gen, &assignment);
-            let value_bits =
-                (u64::BITS - problem.table.iter().max().unwrap().leading_zeros()) as usize;
-            print_solution(&sol, value_bits);
+            let index_bits = calc_log_2(problem.table.len());
+            if !check_data_of_solution(&sol, index_bits) {
+                println!("Data verification: Input indexes are incorrect.");
+            }
+            print_solution(&sol, index_bits);
             if check_solution(&sol, problem) {
                 println!("Verification: Solution is correct.");
             } else {
