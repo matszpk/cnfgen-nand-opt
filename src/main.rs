@@ -101,6 +101,21 @@ fn generate_formulae(problem: &Problem) -> Result<GenSolution, Error> {
         ));
     }
     max_gates_per_layer.reverse();
+    // reduce from from inputs
+    {
+        let mut max_inputs = index_bits;
+        for mgpl in max_gates_per_layer.iter_mut() {
+            let max_gates = (max_inputs * (max_inputs - 1)) >> 1;
+            eprintln!("ggg: {}", max_gates);
+            if max_gates < *mgpl {
+                *mgpl = max_gates;
+                max_inputs += max_gates;
+            } else {
+                break;
+            }
+        }
+    }
+
     let mgpl_bits = max_gates_per_layer
         .iter()
         .map(|x| calc_log_2(*x))
