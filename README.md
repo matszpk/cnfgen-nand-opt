@@ -2,6 +2,10 @@
 
 This program can generate CNF (Conjunctive Normal Form) to check possibility to build
 circuit built on NAND or NOR gates that returns given values from table.
+
+WARNING: For some greater examples this program can generates CNF that can excess
+1 gigabyte.
+
 This program can read problem from file. If no given file then program read problem
 from standard input. The format of input is in TOML format:
 
