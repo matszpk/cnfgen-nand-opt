@@ -19,6 +19,6 @@ gates. The `table` is table of values that should be returned by circuit.
 List of commands:
 
 * generate - Generate CNF file and print it to standard output.
-* execute - Generate CNF file and pass it to SAT solver, check and print results. SAT_SOLVER environment variable must be set to path to SAT solver executable.
+* execute - Generate CNF file and pass it to SAT solver, check and print results. The `SAT_SOLVER` environment variable must be set to path to SAT solver executable.
 * check - Check and print results from SAT output. The SAT output file given as the second argument after command or the first FILE is not given.
 * help - Print help.
