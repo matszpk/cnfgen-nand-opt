@@ -531,7 +531,7 @@ fn main() -> Result<(), Error> {
             }
             "help" | "-h" | "--help" => {
                 println!(
-                    r##"cnfgen-nand-opt generate|execute|check [FILE] [SAT-OUTPUT]
+                    r##"Usage: cnfgen-nand-opt generate|execute|check [FILE] [SAT-OUTPUT]
 
 This program can generate CNF (Conjunctive Normal Form) to check possibility to build
 circuit built on NAND or NOR gates that returns given values from table.
