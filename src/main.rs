@@ -388,7 +388,7 @@ fn get_layer_and_input_id(sol: &Solution, index_bits: usize, input: usize) -> (u
 }
 
 fn print_solution(sol: &Solution, index_bits: usize) {
-    println!("Gate number for layers: {:?}", sol.gate_num_for_layers);
+    println!("Number of gates for layers: {:?}", sol.gate_num_for_layers);
     for (i, l) in sol.gates_input.iter().enumerate() {
         println!("Layer {}:", i + 1);
         for ii in l.iter().take(sol.gate_num_for_layers[i] << 1) {
