@@ -40,6 +40,10 @@ enum Error {
     CNFError(#[from] CNFError),
     #[error("ExecSAT error: {0}")]
     ExecSATError(#[from] exec_sat::Error),
+    #[error("Solution is not correct")]
+    SolNotCorrect,
+    #[error("Solution data is not correct")]
+    SolDataNotCorrect,
 }
 
 #[derive(Deserialize, Debug)]
@@ -108,7 +112,6 @@ fn generate_formulae(problem: &Problem) -> Result<GenSolution, Error> {
             // includes: all pairs of inputs and same gates with this same inputs
             // n*(n-1)/2 + n, where n is max_inputs.
             let max_gates = ((max_inputs * (max_inputs - 1)) >> 1) + max_inputs;
-            eprintln!("ggg: {}", max_gates);
             if max_gates < *mgpl {
                 *mgpl = max_gates;
                 max_inputs += max_gates;
@@ -132,10 +135,10 @@ fn generate_formulae(problem: &Problem) -> Result<GenSolution, Error> {
         .map(|x| calc_log_2(*x))
         .collect::<Vec<_>>();
 
-    eprintln!(
-        "{:?} {:?} {:?}",
-        max_gates_per_layer, max_input_indexes, mii_bits
-    );
+    // eprintln!(
+    //     "{:?} {:?} {:?}",
+    //     max_gates_per_layer, max_input_indexes, mii_bits
+    // );
 
     let gate_num_for_layers = (0..problem.layers)
         .into_iter()
@@ -170,7 +173,6 @@ fn generate_formulae(problem: &Problem) -> Result<GenSolution, Error> {
 
     let mut index_input_starts = vec![0];
     index_input_starts.extend(max_input_indexes);
-    eprintln!("index_input_starts: {:?}", index_input_starts);
 
     // bits of index_input_ranges values: mii_bits[i]
     let mut index_input_ends =
@@ -185,7 +187,6 @@ fn generate_formulae(problem: &Problem) -> Result<GenSolution, Error> {
             index_input_starts[i + 1] - 1,
         )
         .unwrap();
-        //eprintln!("lrange end s: {} {} {}", i, index_input_starts[i + 1] - 1, mii_bits[i + 1]);
         let gate_num_val =
             UDynExprNode::try_from_n(gate_num_for_layers[i].clone(), mii_bits[i + 1]).unwrap();
         // NG(N) + I0+GMAx0+GMax1 ... GMax(N-1)-1
@@ -203,7 +204,6 @@ fn generate_formulae(problem: &Problem) -> Result<GenSolution, Error> {
                 UDynExprNode::try_from_n(index_input_ends[0].clone(), mii_bits[l]).unwrap();
             let mut li_range_cond = li.clone().less_equal(lrange_end);
             for ll in 1..=l {
-                //eprintln!("xxdebug: {} {} {} {}", l, ll, index_input_starts[ll], mii_bits[l]);
                 let lrange_start = UDynExprNode::try_constant_n(
                     creator.clone(),
                     mii_bits[l],
@@ -217,7 +217,6 @@ fn generate_formulae(problem: &Problem) -> Result<GenSolution, Error> {
             }
             conds &= li_range_cond;
         }
-        //eprintln!("xccvc c: {:?}", &conds);
     };
 
     for l in 0..problem.layers {
@@ -452,19 +451,22 @@ fn check_solution(sol: &Solution, problem: &Problem) -> bool {
     true
 }
 
-fn check_from_sat_output(sat_output: SatOutput, gen: &GenSolution, problem: &Problem) {
+fn check_from_sat_output(sat_output: SatOutput, gen: &GenSolution, problem: &Problem) ->
+            Result<(), Error> {
     match sat_output {
         SatOutput::Satisfiable(Some(assignment)) => {
             let sol = get_solution(gen, &assignment);
             let index_bits = calc_log_2(problem.table.len());
             if !check_data_of_solution(&sol, index_bits) {
                 println!("Data verification: Input indexes are incorrect.");
+                return Err(Error::SolDataNotCorrect);
             }
             print_solution(&sol, index_bits);
             if check_solution(&sol, problem) {
                 println!("Verification: Solution is correct.");
             } else {
                 println!("Verification: Solution is incorrect!");
+                return Err(Error::SolNotCorrect);
             }
         }
         SatOutput::Satisfiable(None) => {
@@ -477,6 +479,7 @@ fn check_from_sat_output(sat_output: SatOutput, gen: &GenSolution, problem: &Pro
             println!("Unknown state");
         }
     }
+    Ok(())
 }
 
 fn main() -> Result<(), Error> {
@@ -510,7 +513,7 @@ fn main() -> Result<(), Error> {
                     env::var("SAT_SOLVER").expect("SAT_SOLVER not set"),
                     writer.inner().as_slice(),
                 )?;
-                check_from_sat_output(sat_output, &gen_sol, &problem);
+                return check_from_sat_output(sat_output, &gen_sol, &problem);
             }
             "check" => {
                 let sat_output = args.next();
@@ -525,7 +528,7 @@ fn main() -> Result<(), Error> {
                 let gen_sol = generate_formulae(&problem)?;
                 let sat_output = File::open(sat_output)?;
                 let sat_output = parse_sat_output(BufReader::new(sat_output))?;
-                check_from_sat_output(sat_output, &gen_sol, &problem);
+                return check_from_sat_output(sat_output, &gen_sol, &problem);
             }
             "help" | "-h" | "--help" => {
                 println!(
