@@ -236,10 +236,6 @@ fn generate_formulae(problem: &Problem) -> Result<GenSolution, Error> {
         .collect::<Vec<_>>();
     gen_conditions(&outputs, problem.layers);
 
-    //
-    // eprintln!("Debug problem: {:?}", problem);
-    // eprintln!("Value bits: {}, Index bits: {}", value_bits, index_bits);
-
     for (idx, value) in problem.table.iter().enumerate() {
         let mut all_inputs = (0..index_bits)
             .into_iter()
