@@ -255,6 +255,7 @@ fn generate_formulae(problem: &Problem) -> Result<GenSolution, Error> {
                     .collect::<Vec<_>>(),
             );
 
+            // generate outputs and put to all_inputs
             for i in 0..max_gates_per_layer[l] {
                 let aval = dynint_table(layer_inputs[(i << 1)].clone(), input_table.clone()).bit(0);
                 let bval =
@@ -354,6 +355,7 @@ fn check_layer_and_input_id(sol: &Solution, index_bits: usize, input: usize) -> 
     }
 }
 
+// check data of solution - inputs and outputs
 fn check_data_of_solution(sol: &Solution, index_bits: usize) -> bool {
     for (i, l) in sol.gates_input.iter().enumerate() {
         for ii in l.iter().take(sol.gate_num_for_layers[i] << 1) {
@@ -417,11 +419,12 @@ fn check_solution(sol: &Solution, problem: &Problem) -> bool {
     let mut gates_output = vec![false; *max_input_indexes.last().unwrap()];
     for (index, value) in problem.table.iter().enumerate() {
         gates_output.fill(false);
-        // first input
+        // first input is index
         for i in 0..index_bits {
             gates_output[i] = (index & (1 << i)) != 0;
         }
 
+        // evaluate all outputs
         for (l, layer_inputs) in sol.gates_input.iter().enumerate() {
             let start_index = max_input_indexes[l];
             for i in 0..(sol.gates_input[l].len() >> 1) {
@@ -434,6 +437,7 @@ fn check_solution(sol: &Solution, problem: &Problem) -> bool {
             }
         }
 
+        // convert to number
         let exp_value: u64 = sol
             .output
             .iter()
@@ -522,6 +526,7 @@ fn main() -> Result<(), Error> {
                         sat_output,
                     )
                 } else {
+                    // treat first argument as sat output
                     (read_problem(io::stdin())?, problem_path.unwrap())
                 };
                 let gen_sol = generate_formulae(&problem)?;
