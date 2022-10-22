@@ -367,7 +367,7 @@ fn check_data_of_solution(sol: &Solution, index_bits: usize) -> bool {
             return false;
         }
     }
-    return true;
+    true
 }
 
 fn get_layer_and_input_id(sol: &Solution, index_bits: usize, input: usize) -> (usize, usize) {
@@ -382,7 +382,7 @@ fn get_layer_and_input_id(sol: &Solution, index_bits: usize, input: usize) -> (u
             input -= gi.len() >> 1;
         }
     }
-    return (sol.gates_input.len(), input);
+    (sol.gates_input.len(), input)
 }
 
 fn print_solution(sol: &Solution, index_bits: usize) {
@@ -447,8 +447,11 @@ fn check_solution(sol: &Solution, problem: &Problem) -> bool {
     true
 }
 
-fn check_from_sat_output(sat_output: SatOutput, gen: &GenSolution, problem: &Problem) ->
-            Result<(), Error> {
+fn check_from_sat_output(
+    sat_output: SatOutput,
+    gen: &GenSolution,
+    problem: &Problem,
+) -> Result<(), Error> {
     match sat_output {
         SatOutput::Satisfiable(Some(assignment)) => {
             let sol = get_solution(gen, &assignment);
