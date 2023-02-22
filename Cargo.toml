@@ -2,7 +2,7 @@
 name = "cnfgen-nand-opt"
 authors = ["Mateusz Szpakowski"]
 license = "LGPL-2.1-or-later"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "Generate CNF for circuits"
 repository = "https://github.com/matszpk/cnfgen-nand-opt"

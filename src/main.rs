@@ -67,6 +67,9 @@ fn read_problem(mut reader: impl Read) -> Result<Problem, Error> {
 }
 
 const fn calc_log_2(n: usize) -> usize {
+    if n == 1 {
+        return 1;
+    }
     let nbits = usize::BITS - n.leading_zeros();
     if (1 << (nbits - 1)) == n {
         (nbits - 1) as usize
